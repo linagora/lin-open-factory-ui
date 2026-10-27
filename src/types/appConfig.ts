@@ -1,0 +1,61 @@
+/*
+ * Copyright (C) 2026 Linagora
+ *
+ * This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+ * Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
+ * any later version, provided you comply with the Additional Terms applicable for Lin Open Factory Ui software by
+ * LINAGORA pursuant to Section 7 of the GNU Affero General Public License, subsections (b), (c), and (e), pursuant to
+ * which these Appropriate Legal Notices must notably (i) retain the display of the "LinID™" trademark/logo at the top
+ * of the interface window, the display of the “You are using the Open Source and free version of LinID™, powered by
+ * Linagora © 2009–2013. Contribute to LinID R&D by subscribing to an Enterprise offer!” infobox and in the e-mails
+ * sent with the Program, notice appended to any type of outbound messages (e.g. e-mail and meeting requests) as well
+ * as in the Lin Open Factory Ui user interface, (ii) retain all hypertext links between Lin Open Factory Ui
+ * and https://linid.org/, as well as between LINAGORA and LINAGORA.com, and (iii) refrain from infringing LINAGORA
+ * intellectual property rights over its trademarks and commercial brands. Other Additional Terms apply, see
+ * <http://www.linagora.com/licenses/> for more details.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License and its applicable Additional Terms for
+ * Lin Open Factory Ui along with this program. If not, see <http://www.gnu.org/licenses/> for the GNU Affero
+ * General Public License version 3 and <http://www.linagora.com/licenses/> for the Additional Terms applicable to the
+ * Lin Open Factory Ui software.
+ */
+
+import type { Remote } from './remotes';
+import type { ThemeVariables } from './theme';
+
+/**
+ * Runtime application configuration loaded from `public/config.json`. Holds deployment-specific values that must be
+ * tunable without rebuilding the UI.
+ */
+export interface AppConfig {
+  /**
+   * Deployment environment identifier (e.g. 'DEV', 'INTEG', 'PREPROD', 'PROD').
+   *
+   * This value is injected at runtime and may come from server-side substitution (e.g. Nginx env injection). If the
+   * value is missing or invalid, the application may fallback to a default environment such as 'DEV'.
+   */
+  environment: string;
+  /** Internationalization configuration for the application. */
+  i18n: {
+    /** Array of supported language codes. */
+    languages: string[];
+    /** Default locale of the application. */
+    locale: string;
+    /** Array of internationalization file names. */
+    i18nFiles: string[];
+  };
+  /** Theme variables of the project. */
+  themeVariables: ThemeVariables;
+  /** List of remote Module Federation modules. */
+  remotes: Remote[];
+  /** List of module files to be loaded for the UI. */
+  modules: string[];
+  /** List of additional zone definition files to be loaded for the UI. */
+  extraZones?: string[];
+  /** List of design files to be loaded for the UI. */
+  designFiles: string[];
+}

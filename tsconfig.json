@@ -1,0 +1,15 @@
+{
+  "extends": "./.quasar/tsconfig.json",
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": [
+    "src",
+    "quasar.config.ts",
+    "vitest.config.mts",
+    "tests/setup.ts",
+    "tests/mocks",
+    "tests/unit"
+  ]
+}

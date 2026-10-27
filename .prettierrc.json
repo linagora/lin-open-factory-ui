@@ -1,0 +1,7 @@
+{
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "singleAttributePerLine": true,
+  "jsdocPrintWidth": 120,
+  "plugins": ["prettier-plugin-jsdoc"]
+}

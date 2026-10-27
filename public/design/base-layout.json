@@ -1,0 +1,69 @@
+{
+  "base-layout": {
+    "header": {
+      "q-header": {},
+      "q-toolbar": {},
+      "q-avatar": {},
+      "q-badge": {},
+      "navigation-menu": {
+        "q-tabs": {}
+      },
+      "q-img": {
+        "src": "/toolbarApplicationLogo.svg"
+      },
+      "header-profile": {
+        "q-btn": {
+          "flat": true,
+          "textColor": "white"
+        },
+        "q-item-section": {
+          "avatar": true
+        },
+        "q-item-label": {
+          "caption": true
+        },
+        "q-select": {
+          "dense": true,
+          "borderless": true
+        },
+        "q-item": {
+          "dense": true
+        },
+        "q-img": {
+          "width": "25px",
+          "fit": "contain"
+        },
+        "logout-menu-item": {
+          "q-item": {
+            "dense": true
+          },
+          "confirmation-dialog": {
+            "q-dialog": {
+              "persistent": false
+            },
+            "buttons-card": {
+              "q-card": {
+                "flat": true
+              },
+              "q-card-actions": {
+                "align": "right"
+              },
+              "confirm-button": {
+                "q-btn": {
+                  "color": "primary",
+                  "outline": false
+                }
+              },
+              "cancel-button": {
+                "q-btn": {
+                  "color": "primary",
+                  "outline": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

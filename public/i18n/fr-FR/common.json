@@ -1,0 +1,51 @@
+{
+  "application": {
+    "title": "Lin Open Factory Ui",
+    "version": "Version de développement",
+    "DEV": {
+      "version": "Version de développement"
+    },
+    "INTEG": {
+      "version": "Version d'intégration"
+    },
+    "PREPROD": {
+      "version": "Version de pré-production"
+    },
+    "PROD": {
+      "version": "Version de production"
+    },
+    "DEMO": {
+      "version": "Version de démo"
+    },
+    "dateTimeFormat": "DD/MM/YYYY HH:mm:ss",
+    "dateFormatApi": "YYYY-MM-DDTHH:mm:ssZ",
+    "dateFormat": "DD/MM/YYYY",
+    "language": {
+      "title": "Langue"
+    },
+    "languages": {
+      "fr-FR": "Français",
+      "en-US": "English (US)"
+    },
+    "logout": {
+      "label": "Se déconnecter",
+      "error": "Impossible d’atteindre la page de déconnexion.",
+      "ConfirmationDialog": {
+        "title": "Déconnexion",
+        "content": "Êtes-vous sûr de vouloir vous déconnecter ?",
+        "ButtonsCard": {
+          "confirm": "Se déconnecter",
+          "cancel": "Annuler"
+        }
+      }
+    }
+  },
+  "Homepage": {
+    "title": "Lin Open Factory Ui",
+    "intro": "<strong>Lin Open Factory Ui</strong> est une interface web open source et configurable.",
+    "opensource": "<strong>Projet open source</strong> développé et maintenu par <a href=\"https://linagora.com\" target=\"_blank\" rel=\"noopener\">LINAGORA</a>.",
+    "license": "Ce projet est distribué sous la licence <strong>GNU Affero General Public License v3</strong> (AGPLv3), garantissant qu'il reste libre et open source pour tous.",
+    "links": "<ul class=\"q-pl-md\"><li>Code source disponible sur <a href=\"https://github.com/linagora/lin-open-factory-ui\" target=\"_blank\" rel=\"noopener\">GitHub</a></li><li>Si vous trouvez un bug, merci de le signaler <a href=\"https://github.com/linagora/lin-open-factory-ui/issues/new?template=bug_report.yml\" target=\"_blank\" rel=\"noopener\">ici</a>.</li></ul>",
+    "branding": "<div class='row items-center q-gutter-x-sm q-pt-md'><img src='/applicationLogo.svg' alt='Logo application' style='height: 32px' /><span class='text-caption'>Un projet de</span><a href='https://linagora.com' target='_blank' rel='noopener' class='text-primary text-weight-bold'>LINAGORA</a></div>"
+  }
+}
