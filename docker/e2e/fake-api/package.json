@@ -1,0 +1,13 @@
+{
+  "name": "@linagora/lin-open-factory-fake-api",
+  "version": "0.0.0",
+  "description": "Fake of the LinID API for the E2E environment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "fastify": "5.12.7"
+  }
+}

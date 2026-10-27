@@ -1,0 +1,117 @@
+name: lin_open_factory_e2e
+
+services:
+  db:
+    image: postgres:18.4-alpine
+    container_name: lin-open-factory-db
+    networks:
+      - lin-open-factory-e2e-network
+    env_file:
+      - ./env/db.env
+    volumes:
+      - ../init-db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1' || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  auth:
+    image: lemonldapng/lemonldap-ng:2.23
+    container_name: lin-open-factory-lemon
+    networks:
+      - lin-open-factory-e2e-network
+    env_file:
+      - ./env/lemon.env
+      - ./env/${ENV}.env
+    volumes:
+      - ./resources/${CONFIG_DIR}/llng/conf:/var/lib/lemonldap-ng/conf
+      - ./resources/oidc.key:/etc/keys/oidc.key:ro
+      - ./resources/oidc.pub:/etc/keys/oidc.pub:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-check-certificate --spider -q --header=\"Host: $$SSODOMAIN\" \"http://127.0.0.1/checkstate?secret=$$LEMONLDAP_CHECKSTATE_SECRET\""
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ui:
+    image: lin-open-factory-ui
+    container_name: lin-open-factory-ui
+    networks:
+      - lin-open-factory-e2e-network
+    ports:
+      - 9000:443
+    env_file:
+      - ./env/ui.env
+    # The OIDC issuer is reached at its public URL, served by this container through the host
+    extra_hosts:
+      - "linid.localtest.me:host-gateway"
+    environment:
+      APP_ENV: ${ENVIRONMENT}
+    volumes:
+      - ../certs/ca.crt:/etc/server/certs/ca.crt:ro
+      - ./resources/${CONFIG_DIR}/conf/server-config.json:/app/server-config.json:ro
+      - ./resources/server.crt:/etc/server/certs/server.crt:ro
+      - ./resources/server.key:/etc/server/certs/server.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://localhost/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      catalog-ui:
+        condition: service_started
+      api:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+
+  # Fake of the LinID API, answering an empty object to any request
+  api:
+    image: lin-open-factory-fake-api
+    container_name: lin-open-factory-api
+    # Forwards the stop signal to node, which ignores it as PID 1
+    init: true
+    networks:
+      - lin-open-factory-e2e-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  catalog-ui:
+    image: linagora/lin-pulsar:v0.3.0
+    container_name: lin-open-factory-catalog-ui
+    networks:
+      - lin-open-factory-e2e-network
+    volumes:
+      - ./resources/nginx-modules.conf:/etc/nginx/nginx.conf:ro
+
+  e2e-test-runner:
+    image: vincentmoittie/e2e-test-runner:v2.2.0
+    container_name: lin-open-factory-e2e-test-runner
+    networks:
+      - lin-open-factory-e2e-network
+    env_file:
+      - ./env/${ENV}.env
+    volumes:
+      - ../../tests/features:/app/features
+    depends_on:
+      ui:
+        condition: service_healthy
+    profiles:
+      - test
+
+networks:
+  lin-open-factory-e2e-network:
+    name: lin-open-factory-e2e-network
+    driver: bridge
