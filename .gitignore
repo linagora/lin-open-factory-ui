@@ -1,0 +1,22 @@
+# Logs
+*.log
+
+# Local overrides
+docker-compose.override.yml
+
+# Intellij
+.idea
+
+# Build artifacts
+node_modules/
+dist/
+.quasar/
+coverage/
+
+# Generated files
+docker/**/*.crt
+docker/**/*.key
+docker/**/*.pub
+docker/dev/resources/llng
+docker/e2e/resources/local
+docker/e2e/resources/ci
