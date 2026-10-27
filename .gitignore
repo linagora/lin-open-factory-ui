@@ -20,3 +20,7 @@ docker/**/*.pub
 docker/dev/resources/llng
 docker/e2e/resources/local
 docker/e2e/resources/ci
+
+# Module Federation
+.__mf__temp/
+**/__mf__temp/

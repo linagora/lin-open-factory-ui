@@ -1,0 +1,11 @@
+dist/
+node_modules/
+coverage/
+docker/
+docs/
+tests/e2e/
+*.md
+pnpm-lock.yaml
+package-lock.json
+*.min.js
+*.min.css
