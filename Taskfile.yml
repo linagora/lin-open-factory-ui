@@ -1,0 +1,382 @@
+version: "3"
+
+silent: true
+
+tasks:
+  # ─── Setup ─────────────────────────────────────────────────────────
+
+  setup:
+    desc: Generate certificates, build Docker images and config files for all environments
+    cmds:
+      - task: setup:certs
+      - task: build:images
+      - task: setup:config
+
+  setup:dev:
+    desc: Setup certificates for dev environment
+    cmds:
+      - task: setup:certs:dev
+
+  setup:e2e:
+    desc: Setup certificates, config files and Docker images for E2E environment
+    cmds:
+      - task: setup:certs:e2e
+      - task: setup:lemonldap-config:e2e
+      - task: setup:config
+      - task: build:images
+
+  setup:certs:
+    desc: Generate all certificates and keys for all environments
+    cmds:
+      - task: setup:certs:dev
+      - task: setup:certs:e2e
+
+  setup:certs:dev:
+    desc: Generate certificates and keys for dev environment
+    cmds:
+      - task: generate:certs
+        vars:
+          ENV: dev
+
+  setup:certs:e2e:
+    desc: Generate certificates and keys for E2E environment
+    cmds:
+      - task: generate:certs
+        vars:
+          ENV: e2e
+
+  setup:lemonldap-config:e2e:
+    desc: Generate LemonLDAP configuration for E2E environment
+    cmds:
+      - task: generate:config:lemonldap
+        vars:
+          ENV: e2e
+          ENV_FILE: env/local.env
+      - task: generate:config:lemonldap
+        vars:
+          ENV: e2e
+          ENV_FILE: env/e2e.env
+
+  setup:config:
+    desc: Generate configuration files
+    cmds:
+      - task: generate:config
+        vars:
+          ENV: e2e
+          ENV_FILE: env/local.env
+      - task: generate:config
+        vars:
+          ENV: e2e
+          ENV_FILE: env/e2e.env
+
+  # ─── Dev environment ──────────────────────────────────────────────
+
+  start:dev:
+    desc: Start the UI server (BFF) of the dev environment, the frontend being started with pnpm dev
+    cmds:
+      - echo "Starting all services..."
+      - task: start:service
+        vars:
+          SERVICE_NAME: BFF (Fastify)
+          CMD: '{{.TASK_EXE}} start:dev:server'
+          HEALTHCHECK: curl -s http://localhost:3000/health >/dev/null 2>&1
+          TIMEOUT: 30
+          LOG_FILE: /tmp/lin-open-factory-bff-server.log
+      - echo ""
+      - echo "  ✔ All services ready!"
+      - echo "    BFF (Fastify) → http://localhost:3000"
+      - echo "    Frontend → run pnpm dev, then open https://localhost:9000"
+      - echo ""
+      - echo "  Logs:"
+      - echo "    BFF (Fastify)    /tmp/lin-open-factory-bff-server.log"
+
+  stop:dev:
+    desc: Stop the dev environment
+    cmds:
+      - echo "Stopping all services..."
+      # Stops the watcher of tsx, which stops the BFF
+      - cmd: |
+          pnpm --dir server --silent stop:dev \
+            && echo "  ✔ BFF (Fastify) stopped" \
+            || echo "  ○ BFF (Fastify) (not running)"
+
+  restart:dev:
+    desc: Restart the dev environment
+    cmds:
+      - task: stop:dev
+      - echo ""
+      - task: start:dev
+
+  start:dev:server:
+    desc: Start the Fastify server of the UI in watch mode
+    dir: server
+    env:
+      # Local CA that signs the certificates of the SSO and the API, read by Node.js at startup only
+      NODE_EXTRA_CA_CERTS: ../docker/certs/ca.crt
+    cmds:
+      - pnpm dev
+
+  # ─── E2E environment ──────────────────────────────────────────────
+
+  start:e2e:
+    desc: Start the full E2E environment (all-in-Docker)
+    vars:
+      ENV_FILE: '{{.ENV_FILE | default "env/local.env"}}'
+    cmds:
+      - echo "Starting all services..."
+      - task: start:service
+        vars:
+          SERVICE_NAME: Docker services
+          LOG_FILE: /tmp/lin-open-factory-docker.log
+          CMD: cd docker/e2e && docker compose --env-file "{{.ENV_FILE}}" up -d --quiet-pull
+          HEALTHCHECK: curl -sk https://linid.localtest.me:9000 >/dev/null 2>&1
+          TIMEOUT: 120
+      - echo ""
+      - echo "  ✔ E2E environment ready!"
+      - cmd: echo "  → https://linid.localtest.me:9000"
+        if: '[ "{{.ENV_FILE}}" == "env/local.env" ]'
+      - echo ""
+      - echo "  Logs:"
+      - echo "    Docker       /tmp/lin-open-factory-docker.log"
+
+  stop:e2e:
+    desc: Stop the full E2E environment
+    vars:
+      ENV_FILE: '{{.ENV_FILE | default "env/local.env"}}'
+    cmds:
+      - echo "Stopping all services..."
+      - task: stop:compose
+        vars:
+          SERVICE_NAME: Docker services
+          DIR: docker/e2e
+          ENV_FILE: "{{.ENV_FILE}}"
+      - echo ""
+      - echo "  E2E environment stopped."
+
+  restart:e2e:
+    desc: Restart the full E2E environment
+    cmds:
+      - task: stop:e2e
+      - echo ""
+      - task: start:e2e
+
+  # ─── Tests ─────────────────────────────────────────────────────────
+
+  setup:test:
+    desc: Install E2E test dependencies
+    dir: tests/e2e
+    cmd: npm install
+
+  lint:test:
+    desc: Lint Gherkin feature files
+    dir: tests/e2e
+    cmd: npx gherkin-lint "../features/**/*.feature"
+
+  start:test:ci:
+    desc: Run E2E tests in CI environment (Docker-based)
+    dir: docker/e2e
+    vars:
+      ENV_FILE: env/e2e.env
+    cmds:
+      - task: start:e2e
+        vars:
+          ENV_FILE: env/e2e.env
+      - docker compose --env-file env/e2e.env run --rm e2e-test-runner
+      - task: stop:e2e
+        vars:
+          ENV_FILE: env/e2e.env
+
+  start:test:
+    desc: Run E2E tests locally
+    deps: [setup:test]
+    dir: tests/e2e
+    dotenv: ["../../docker/e2e/env/local.env"]
+    vars:
+      SPEC: '{{.SPEC | default ""}}'
+    cmds:
+      - task: start:e2e
+      - cmd: '{{if .SPEC}}npx cypress run --spec "{{.SPEC}}"{{else}}npm run start{{end}}'
+
+  start:test:ui:
+    desc: Open Cypress UI for E2E testing locally
+    deps: [setup:test]
+    dir: tests/e2e
+    dotenv: ["../../docker/e2e/env/local.env"]
+    cmds:
+      - task: start:e2e
+      - npm run start:ui
+
+  # ─── Internal tasks ─────────────────────────────────────────────────────────
+
+  generate:ca:
+    desc: Generate the local certificate authority shared by all environments
+    internal: true
+    status:
+      - test -f docker/certs/ca.key
+      - test -f docker/certs/ca.crt
+    cmds:
+      - cmd: mkdir -p docker/certs
+      - cmd: |
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout docker/certs/ca.key \
+            -out docker/certs/ca.crt \
+            -days 3650 -nodes \
+            -subj "/CN=LinID Development CA/O=LinID/C=FR" >/dev/null 2>&1
+
+  generate:certs:
+    desc: Generate certificates and keys for a specific environment
+    internal: true
+    dir: "docker/{{.ENV}}/resources"
+    cmds:
+      - task: generate:ca
+      # Server certificate signed by the local CA, shared by all HTTPS services
+      - cmd: rm -fv server.key server.crt
+      - cmd: |
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout server.key \
+            -out server.crt \
+            -days 3650 -nodes \
+            -subj "/CN=linid.localtest.me/OU=Test/O=Test/L=Test/ST=Test/C=FR" \
+            -addext "basicConstraints=critical,CA:FALSE" \
+            -addext "subjectAltName=DNS:linid.localtest.me,DNS:ui,DNS:localhost" \
+            -CA {{.ROOT_DIR}}/docker/certs/ca.crt \
+            -CAkey {{.ROOT_DIR}}/docker/certs/ca.key >/dev/null 2>&1
+      # OIDC signing keys
+      - cmd: rm -fv oidc.key oidc.pub
+      - cmd: |
+          openssl genpkey -algorithm RSA \
+            -out oidc.key \
+            -pkeyopt rsa_keygen_bits:2048 >/dev/null 2>&1 \
+          && openssl pkey \
+            -in oidc.key \
+            -pubout -out oidc.pub >/dev/null 2>&1
+
+  generate:config:
+    desc: Generate configuration from templates using env variables
+    internal: true
+    dir: "docker/{{.ENV}}/resources"
+    dotenv: ["../{{.ENV_FILE}}", "../env/ui.env"]
+    cmds:
+      - rm -rf ${CONFIG_DIR}/conf
+      - mkdir -p ${CONFIG_DIR}/conf
+      - envsubst < server-config.template.json > ${CONFIG_DIR}/conf/server-config.json
+
+  generate:config:lemonldap:
+    desc: Generate LemonLDAP configuration from template using env variables
+    internal: true
+    dir: "docker/{{.ENV}}/resources"
+    dotenv: ["../{{.ENV_FILE}}"]
+    vars:
+      CONFIG_DIR: "${CONFIG_DIR:+${CONFIG_DIR}/}"
+    cmd: |
+      rm -rf {{.CONFIG_DIR}}llng
+      export OIDC_PRIVATE_KEY=$(awk '{printf "%s\\n", $0}' oidc.key)
+      export OIDC_PUBLIC_KEY=$(awk '{printf "%s\\n", $0}' oidc.pub)
+      mkdir -p {{.CONFIG_DIR}}llng/conf
+      envsubst < lmConf-1.template.json > {{.CONFIG_DIR}}llng/conf/lmConf-1.json
+
+  build:images:
+    desc: Build all Docker images
+    cmds:
+      - task: build:image:ui
+      - task: build:image:fake-api
+
+  build:image:fake-api:
+    desc: Build the Docker image of the fake LinID API of the E2E environment
+    cmds:
+      - task: build:image
+        vars:
+          IMAGE_NAME: lin-open-factory-fake-api
+          DOCKERFILE: docker/e2e/fake-api/Dockerfile
+          CONTEXT_DIR: docker/e2e/fake-api/
+
+  build:image:ui:
+    desc: Build lin-open-factory-ui Docker image
+    cmds:
+      - task: build:image
+        vars:
+          IMAGE_NAME: lin-open-factory-ui
+          DOCKERFILE: Dockerfile
+          CONTEXT_DIR: .
+
+  build:image:
+    desc: Build a specific Docker image
+    internal: true
+    vars:
+      LOG_FILE: "/tmp/{{.IMAGE_NAME}}-image.log"
+    cmd: |
+      sh -c '
+        docker build --quiet -f {{.DOCKERFILE}} -t {{.IMAGE_NAME}} {{.CONTEXT_DIR}} > {{.LOG_FILE}} 2>&1 &
+        p=$!
+        while kill -0 $p 2>/dev/null; do
+          dots=""
+          for i in 1 2 3 4; do
+            kill -0 $p 2>/dev/null || break 2
+            printf "\r  ⏳ Building {{.IMAGE_NAME}} image%-3s" "$dots"
+            dots="${dots}."
+            sleep 0.5
+          done
+        done
+        wait $p
+        r=$?
+        [ $r -eq 0 ] \
+          && printf "\r  ✔ {{.IMAGE_NAME}} image built      \n" \
+          || { printf "\r  ✗ {{.IMAGE_NAME}} image build failed — see {{.LOG_FILE}}\n"; exit $r; }
+      '
+
+  start:service:
+    desc: Start a specific service locally
+    internal: true
+    cmd: |
+      sh -c '
+        {{.CMD}} > {{.LOG_FILE}} 2>&1 &
+        p=$!
+        elapsed=0
+        while ! {{.HEALTHCHECK}} 2>/dev/null; do
+          if ! kill -0 $p 2>/dev/null; then
+            printf "\r  ✗ {{.SERVICE_NAME}} crashed — see {{.LOG_FILE}}\n"
+            exit 1
+          fi
+          if [ $elapsed -ge {{.TIMEOUT}} ]; then
+            printf "\r  ✗ {{.SERVICE_NAME}} not ready after {{.TIMEOUT}}s — see {{.LOG_FILE}}\n"
+            exit 1
+          fi
+          dots=""
+          for i in 1 2 3 4; do
+            if {{.HEALTHCHECK}} 2>/dev/null; then break 2; fi
+            printf "\r  ⏳ Starting {{.SERVICE_NAME}}%-3s" "$dots"
+            dots="${dots}."
+            sleep 1
+            elapsed=$((elapsed + 1))
+          done
+        done
+        printf "\r  ✔ {{.SERVICE_NAME}} started                    \n"
+      '
+
+  stop:service:
+    desc: Stop a specific service
+    internal: true
+    cmd: |
+      pids=$(lsof -t -i:{{.PORT}}) \
+        && /bin/kill $pids \
+        && echo "  ✔ {{.SERVICE_NAME}} stopped" \
+        || echo "  ○ {{.SERVICE_NAME}} (not running)"
+
+  stop:compose:
+    desc: Stop Docker Compose services
+    vars:
+      ENV_FILE: '{{.ENV_FILE | default "env/local.env"}}'
+    internal: true
+    dir: "{{.DIR}}"
+    cmd: |
+      running=$(docker compose --env-file "{{.ENV_FILE}}" ps --status running -q 2>/dev/null || true)
+
+      if [ -z "$running" ]; then
+        echo "  ○ {{.SERVICE_NAME}} (not running)"
+        exit 0
+      fi
+
+      set -o pipefail
+      docker compose --env-file "{{.ENV_FILE}}" down -v --remove-orphans 2>&1 | tee /tmp/lin-open-factory-docker.log
+
+      echo "  ✔ {{.SERVICE_NAME}} stopped"
