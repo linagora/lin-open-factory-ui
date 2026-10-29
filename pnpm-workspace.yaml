@@ -1,0 +1,11 @@
+packages:
+  - .
+  - server
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+# Patched versions of transitive dependencies pinned by their parents, for their security fixes
+overrides:
+  '@module-federation/dts-plugin>adm-zip': 0.6.1
+  '@module-federation/dts-plugin>undici': ^7.30.1
+  '@quasar/app-vite>esbuild': ^0.28.1

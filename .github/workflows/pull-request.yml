@@ -1,0 +1,333 @@
+name: Pull request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  delete-comments:
+    name: Delete bot comment(s)
+    runs-on: linagora
+    steps:
+      - uses: izhangzhihao/delete-comment@d075704468e1cf74e60944d9f335351213c34d85
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          delete_user_name: github-actions[bot]
+          issue_number: ${{ github.event.number }}
+
+  validate-source-branch:
+    name: Validate source branch
+    needs: [delete-comments]
+    runs-on: linagora
+
+    steps:
+      - name: Check branch name
+        id: check
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "Source branch: $BRANCH"
+
+          if [[ "${{ github.base_ref }}" != "main" ]]; then
+            echo "Target branch is '${{ github.base_ref }}', not main — skipping validation"
+            exit 0
+          fi
+
+          if [[ "$BRANCH" =~ ^(release|hotfix|feature)/.+$ ]]; then
+            echo "✅ Branch '$BRANCH' is allowed"
+            exit 0
+          fi
+
+          echo "❌ Branch '$BRANCH' is not allowed"
+          echo "Only release/* and hotfix/* branches can be merged into main"
+          exit 1
+
+      - name: Comment PR on failure
+        if: failure()
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          message: |
+            ❌ **Merge blocked into `main`**
+
+            The source branch `${{ github.head_ref }}` is not allowed to be merged into `main`.
+
+            Allowed source branches are:
+            - `release/*`
+            - `hotfix/*`
+
+            Please create or rename your branch to follow the required naming convention before merging.
+
+  branch-naming-rules:
+    name: Check branch name
+    needs: [delete-comments]
+    runs-on: linagora
+    steps:
+      - uses: deepakputhraya/action-branch-name@5f1cc199284b75145ec2d13434422e6987cf6af8
+        with:
+          regex: '^(feature|bugfix|improvement|release|hotfix)\/[a-z0-9_.-]+$'
+          allowed_prefixes: "feature,bugfix,improvement,release,hotfix"
+          ignore: main
+          min_length: 5
+          max_length: 50
+
+  commit-checks:
+    name: Check commit messages
+    needs: [delete-comments]
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Installed outside the project: in the project, npm would also install all its dependencies
+      - name: Install commitlint
+        run: npm install --prefix "$RUNNER_TEMP/commitlint" @commitlint/config-conventional @commitlint/cli
+
+      - name: Run commitlint
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > "$RUNNER_TEMP/commitlint/commitlint.config.cjs"
+          "$RUNNER_TEMP/commitlint/node_modules/.bin/commitlint" --config "$RUNNER_TEMP/commitlint/commitlint.config.cjs" --from=origin/main --to=HEAD --verbose
+
+  ui-build:
+    name: UI - Build application
+    needs: [validate-source-branch]
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/pnpm-install
+
+      - name: Build application
+        run: pnpm build
+
+  ui-check-style:
+    name: UI - Code style
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    needs: [ui-build]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/pnpm-install
+
+      - name: Check style
+        run: pnpm validate
+
+      - name: Check server types and style
+        run: pnpm --dir server validate
+
+  ui-unit-tests:
+    name: UI - Unit tests
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    needs: [ui-build]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/pnpm-install
+
+      - name: Run unit tests
+        # The containers run the steps with sh, which has no pipefail
+        shell: bash
+        run: |
+          set -o pipefail
+          echo '```bash' > coverage.txt
+          pnpm test:ci | sed 's/\x1b\[[0-9;]*m//g' >> coverage.txt
+          echo '```' >> coverage.txt
+
+      - name: Comment PR
+        if: success()
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: ui-unit-tests
+          path: coverage.txt
+
+  ui-check-dependencies:
+    name: UI - Check dependencies
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    needs: [ui-build]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/pnpm-install
+
+      - name: Check outdated dependencies
+        run: |
+          pnpm add -w -D npm-check-updates
+          echo '```bash' > dependencies.txt
+          npx ncu >> dependencies.txt
+          echo '```' >> dependencies.txt
+
+      - name: Comment PR
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: ui-check-dependencies
+          path: dependencies.txt
+
+  e2e-check-style:
+    name: E2E - Code style
+    needs: [validate-source-branch]
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: "recursive"
+
+      - name: Install dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Check style
+        working-directory: tests/e2e
+        run: E2E_SPEC_PATTERN=../features npm run lint
+
+  e2e-tests:
+    name: E2E tests
+    runs-on: linagora
+    needs: [ui-build]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: "recursive"
+
+      - name: Install Task
+        uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install envsubst for the config tasks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext-base
+      - name: Run e2e tests
+        run: |
+          task setup:e2e
+          task start:test:ci
+
+      - name: Dump docker logs
+        if: failure()
+        working-directory: docker/e2e
+        run: |
+          cat /tmp/lin-open-factory-docker.log || true
+          docker compose logs || true
+
+      - name: Stop docker services
+        if: failure()
+        working-directory: docker/e2e
+        run: docker compose --env-file env/e2e.env down
+
+  security-malware-scan:
+    name: Security - Malware Scan
+    needs: [delete-comments]
+    runs-on: linagora
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@2755f94762bf5012bc7be82c93e172eabbcd0802 # v2.2.0
+        with:
+          fail-on-critical: true
+
+  security-sast:
+    name: Security - SAST
+    needs: [delete-comments]
+    runs-on: linagora
+    container:
+      image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
+      credentials:
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_TOKEN }}
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript
+      - uses: github/codeql-action/analyze@v4
+
+  security-dependency-review:
+    name: Security - Dependency Review
+    needs: [delete-comments]
+    runs-on: linagora
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: critical
+
+  security-github-actions:
+    name: Security - GitHub Actions
+    needs: [delete-comments]
+    runs-on: linagora
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+
+  security-container:
+    name: Security - Container
+    needs: [delete-comments]
+    runs-on: linagora
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: "recursive"
+          persist-credentials: false
+      - name: Install Task
+        uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install envsubst for the config tasks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext-base
+      - name: Setup certificates for image
+        run: task setup:e2e
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: lin-open-factory-ui
+          severity: CRITICAL,HIGH
+          exit-code: "1"

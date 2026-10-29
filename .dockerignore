@@ -1,0 +1,10 @@
+# Only the frontend and the UI server are built in the image
+.git
+.github
+docker
+docs
+tests
+**/node_modules
+**/dist
+.quasar
+coverage

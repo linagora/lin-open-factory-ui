@@ -1,0 +1,76 @@
+{
+  "authentication": "DBI",
+  "cfgDate": 1711324800,
+  "cfgNum": 1,
+  "dbiAuthChain": "dbi:Pg:dbname=${LEMONLDAP_DATABASE_NAME};host=db",
+  "dbiAuthUser": "${LEMONLDAP_DATABASE_ADMIN_USER}",
+  "dbiAuthPassword": "${LEMONLDAP_DATABASE_ADMIN_PASSWORD}",
+  "dbiAuthTable": "lemonldap_accounts",
+  "dbiAuthLoginCol": "username",
+  "dbiAuthPasswordCol": "password",
+  "dbiAuthPasswordHash": "",
+  "dbiUserChain": "dbi:Pg:dbname=${LEMONLDAP_DATABASE_NAME};host=db",
+  "dbiUserUser": "${LEMONLDAP_DATABASE_USER}",
+  "dbiUserPassword": "${LEMONLDAP_DATABASE_PASSWORD}",
+  "dbiUserTable": "lemonldap_accounts",
+  "dbiPasswordMailCol": "mail",
+  "userPivot": "username",
+  "dbiExportedVars": {
+    "cn": "cn",
+    "mail": "mail",
+    "uid": "username",
+    "roles": "roles"
+  },
+  "domain": "${LEMONLDAP_SSO_DOMAIN}",
+  "issuerDBOpenIDConnectActivation": 1,
+  "key": "t3st-s3cr3t-k3y!",
+  "locationRules": {
+    "${LEMONLDAP_SSO_DOMAIN}": {
+      "(?#errors)^/lmerror/": "accept",
+      "default": "accept"
+    }
+  },
+  "oidcRPMetaDataExportedVars": {
+    "lin-open-factory": {
+      "email": "mail",
+      "name": "cn",
+      "sub": "uid",
+      "preferred_username": "uid",
+      "roles": "roles"
+    }
+  },
+  "oidcRPMetaDataOptions": {
+    "lin-open-factory": {
+      "oidcRPMetaDataOptionsAccessTokenClaims": 1,
+      "oidcRPMetaDataOptionsAccessTokenJWT": 1,
+      "oidcRPMetaDataOptionsAccessTokenSignAlg": "RS256",
+      "oidcRPMetaDataOptionsIDTokenSignAlg": "RS256",
+      "oidcRPMetaDataOptionsAllowPasswordGrant": 1,
+      "oidcRPMetaDataOptionsPublic": 0,
+      "oidcRPMetaDataOptionsRequirePKCE": 1,
+      "oidcRPMetaDataOptionsRefreshToken": 1,
+      "oidcRPMetaDataOptionsBypassConsent": 1,
+      "oidcRPMetaDataOptionsClientID": "lin-open-factory-client",
+      "oidcRPMetaDataOptionsClientSecret": "${OIDC_CLIENT_SECRET}",
+      "oidcRPMetaDataOptionsRedirectUris": "${LEMONLDAP_REDIRECT_URL}/auth/callback",
+      "oidcRPMetaDataOptionsPostLogoutRedirectUris": "${LEMONLDAP_REDIRECT_URL}/auth/logged-out",
+      "oidcRPMetaDataOptionsIDTokenForceClaims": 1,
+      "oidcRPMetaDataOptionsExtraClaims": {
+        "roles": "roles"
+      },
+      "oidcRPMetaDataOptionsAccessTokenExpiration": 7200,
+      "oidcRPMetaDataOptionsIDTokenExpiration": 7200
+    }
+  },
+  "oidcServicePrivateKeySig": "${OIDC_PRIVATE_KEY}",
+  "oidcServicePublicKeySig": "${OIDC_PUBLIC_KEY}",
+  "passwordDB": "DBI",
+  "persistentStorage": "Apache::Session::File",
+  "persistentStorageOptions": {
+    "Directory": "/var/lib/lemonldap-ng/psessions",
+    "LockDirectory": "/var/lib/lemonldap-ng/psessions/lock"
+  },
+  "portal": "${LEMONLDAP_PORTAL_URL}",
+  "securedCookie": 1,
+  "userDB": "DBI"
+}
