@@ -32,7 +32,7 @@ jobs:
             exit 0
           fi
 
-          if [[ "$BRANCH" =~ ^(release|hotfix)/.+$ ]]; then
+          if [[ "$BRANCH" =~ ^(release|hotfix|feature)/.+$ ]]; then
             echo "✅ Branch '$BRANCH' is allowed"
             exit 0
           fi
