@@ -27,7 +27,21 @@
     "secret": "dev-only-session-secret-do-not-use-in-production",
     "cookieName": "lin-open-factory",
     "maxAgeMilliseconds": 28800000,
-    "lruCache": { "max": 10000, "ttl": 28800000, "ttlAutopurge": true },
+    "database": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "lin_open_factory",
+      "user": "lin_open_factory_user",
+      "password": "password",
+      "ssl": false,
+      "max": 10,
+      "connectionTimeoutMillis": 5000,
+      "idleTimeoutMillis": 10000
+    },
+    "migrations": {
+      "table": "pgmigrations",
+      "database": { "user": "lin_open_factory_admin", "password": "password" }
+    },
     "secure": false
   },
   "proxies": [
