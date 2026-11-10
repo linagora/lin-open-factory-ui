@@ -24,25 +24,57 @@
  * LinOpenFactoryUi software.
  */
 
+import { fileURLToPath } from 'node:url';
 import { fastifyCookie } from '@fastify/cookie';
 import { fastifySession } from '@fastify/session';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
+import { runner } from 'node-pg-migrate';
 import type { ServerConfig } from '../config/schema.js';
-import { LruSessionStore } from './lru-session-store.js';
+import { PgSessionStore } from './pg-session-store.js';
 
 /**
- * Registers the user session, stored in server memory and identified by a cookie.
+ * Applies the migrations of `server/migrations` not applied yet, in the order of their number, and records them in the
+ * `migrations.pgmigrations` table: out of the `public` schema, the user of the sessions cannot change it. They run with
+ * their own connection, as the user of `session.migrations.database` (the owner of the database), so that the user of
+ * the sessions only reads and writes data. An advisory lock makes the servers starting at the same time apply them
+ * once, one after the other. Called before the server listens, so that no Fastify timeout applies.
+ *
+ * @param session - Configuration of the session.
+ * @param log - Logger of the migrations.
+ */
+export async function migrate(
+  session: ServerConfig['session'],
+  log: FastifyBaseLogger
+): Promise<void> {
+  await runner({
+    databaseUrl: { ...session.database, ...session.migrations?.database },
+    dir: fileURLToPath(new URL('../../migrations', import.meta.url)),
+    direction: 'up',
+    migrationsTable: 'pgmigrations',
+    migrationsSchema: 'migrations',
+    createMigrationsSchema: true,
+    // The servers starting meanwhile wait for the migrations to end, instead of failing
+    advisoryLockMode: 'wait',
+    logger: log,
+  });
+}
+
+/**
+ * Registers the user session, stored in PostgreSQL and identified by a cookie.
  *
  * @param app - Fastify instance to configure.
  * @param config - Server configuration.
+ * @returns The store of the sessions.
  */
 export function registerSession(
   app: FastifyInstance,
   config: ServerConfig
-): void {
+): PgSessionStore {
+  const store = new PgSessionStore(config.session.database, app.log);
+  app.addHook('onClose', () => store.close());
   app.register(fastifyCookie);
   app.register(fastifySession, {
-    store: new LruSessionStore(config.session.lruCache),
+    store,
     secret: config.session.secret,
     cookieName: config.session.cookieName,
     saveUninitialized: false,
@@ -54,4 +86,5 @@ export function registerSession(
       maxAge: config.session.maxAgeMilliseconds,
     },
   });
+  return store;
 }
