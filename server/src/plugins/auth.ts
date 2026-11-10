@@ -26,8 +26,20 @@
 
 import { fastifyOauth2, type Token } from '@fastify/oauth2';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { LRUCache } from 'lru-cache';
 import type { ServerConfig } from '../config/schema.js';
+import type { PgSessionStore } from './pg-session-store.js';
+
+/** Error thrown by the OAuth 2 client when the identity provider refuses a request. */
+interface OAuth2Error {
+  /** Answer of the identity provider. */
+  data?: {
+    /** Body of the answer. */
+    payload?: {
+      /** OAuth 2 error code, e.g. `invalid_grant`. */
+      error?: string;
+    };
+  };
+}
 
 /** Request of `GET /auth/login`. */
 interface LoginRequest {
@@ -43,35 +55,38 @@ interface LoginRequest {
  *
  * @param app - Fastify instance to configure.
  * @param config - Server configuration.
+ * @param sessionStore - Store of the sessions, locking a session while its tokens are renewed.
  * @returns A function giving the access token of the user session, refreshed if it expires soon.
  */
-export function registerAuth(app: FastifyInstance, config: ServerConfig) {
+export function registerAuth(
+  app: FastifyInstance,
+  config: ServerConfig,
+  sessionStore: PgSessionStore
+) {
   const { oidc } = config;
   const refreshMargin = oidc.refreshMarginMilliseconds ?? 30_000;
 
   app.register(fastifyOauth2, {
     ...oidc.oauth2,
+    credentials: {
+      ...oidc.oauth2.credentials,
+      // The token requests run while a session is locked and holds a database connection: they must not hang
+      http: { timeout: 10_000, ...oidc.oauth2.credentials.http },
+    },
     name: 'oidc',
   });
 
-  // New tokens, by the access token they replace: the requests refreshing the same token at the same time share one
-  // call to the identity provider, and the requests with an outdated copy of the session get the new token instead of
-  // reusing a refresh token already revoked. A new token is kept for the refresh margin only, so it is still valid when
-  // given from the cache
-  const refreshedTokens = new LRUCache<string, Token, Token>({
-    max: config.session.lruCache.max,
-    ttl: refreshMargin,
-    ttlAutopurge: true,
-    fetchMethod: async (_accessToken, _staleToken, { context: token }) => {
-      const { token: newToken } =
-        await app.oidc.getNewAccessTokenUsingRefreshToken(token, {});
-      return {
-        ...newToken,
-        refresh_token: newToken.refresh_token ?? token.refresh_token,
-        id_token: newToken.id_token ?? token.id_token,
-      };
-    },
-  });
+  /** Renewals in progress in this process, by session ID: the parallel requests of a session share one. */
+  const renewals = new Map<string, Promise<Token | undefined>>();
+
+  /**
+   * Tells whether a token expires in more than the refresh margin.
+   *
+   * @param token - Token to check.
+   * @returns `true` if the token can be used without renewal.
+   */
+  const isFresh = (token: Token) =>
+    new Date(token.expires_at).getTime() - refreshMargin > Date.now();
 
   /**
    * Returns the access token of the user session.
@@ -86,19 +101,46 @@ export function registerAuth(app: FastifyInstance, config: ServerConfig) {
     if (!token) {
       return null;
     }
-    // If the token expires in more than the refresh margin, return it
-    if (new Date(token.expires_at).getTime() - refreshMargin > Date.now()) {
+    if (isFresh(token)) {
       return token.access_token;
     }
 
+    const { sessionId } = request.session;
     try {
-      const newToken = await refreshedTokens.forceFetch(token.access_token, {
-        context: token,
-      });
-      request.session.token = newToken;
+      // The session is locked in the database: the requests renewing it at the same time, on any server, wait, then
+      // get the token saved by the first one instead of reusing a refresh token already revoked. Within this process,
+      // they share the same renewal, holding one database connection instead of one each
+      let renewal = renewals.get(sessionId);
+      if (!renewal) {
+        renewal = sessionStore
+          .updateToken(sessionId, async (savedToken) => {
+            if (!savedToken || isFresh(savedToken)) {
+              return savedToken;
+            }
+            const { token: renewed } =
+              await app.oidc.getNewAccessTokenUsingRefreshToken(savedToken, {});
+            return {
+              ...renewed,
+              refresh_token: renewed.refresh_token ?? savedToken.refresh_token,
+              id_token: renewed.id_token ?? savedToken.id_token,
+            };
+          })
+          .finally(() => renewals.delete(sessionId));
+        renewals.set(sessionId, renewal);
+      }
+      const newToken = await renewal;
+      // The session was deleted meanwhile (e.g. logout) or has expired
+      if (!newToken) {
+        return null;
+      }
+      // The new token is already saved: the session of the request is left unchanged, so that it is not saved again,
+      // which would bring back a session deleted meanwhile
       return newToken.access_token;
-    } catch (error: any) {
-      if (error?.data?.payload?.error !== 'invalid_grant') {
+    } catch (error) {
+      // Error of the OAuth 2 client, carrying the answer of the identity provider
+      const providerError = (error as OAuth2Error | undefined)?.data?.payload
+        ?.error;
+      if (providerError !== 'invalid_grant') {
         throw error;
       }
       request.log.info('Refresh token rejected, session deleted');

@@ -26,9 +26,13 @@
 
 import { buildApp } from './app.js';
 import { loadConfig } from './config/loadConfig.js';
+import { migrate } from './plugins/session.js';
 
 const config = loadConfig();
 const app = buildApp(config);
+
+// Before listen(): the onReady hooks are cut after the pluginTimeout of Fastify (10 seconds)
+await migrate(config.session, app.log);
 
 await app.listen({ port: config.http.port, host: '::' });
 

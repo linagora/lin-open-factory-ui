@@ -76,26 +76,29 @@ function isSameOrigin(request: FastifyRequest): boolean {
 }
 
 /**
- * Registers the reverse proxies declared in `proxies`. The routes with `withAccessToken` send the access token of the
- * user session to the upstream, and answer 401 without calling it if the user is not logged in. They answer 403 to the
- * `POST`, `PUT`, `PATCH` and `DELETE` requests coming from another site.
+ * Registers the reverse proxies declared in `proxies` with `withAccessToken` when `getFreshAccessToken` is given (in
+ * the scope of the session), the others otherwise (out of it, without database query). The routes with
+ * `withAccessToken` send the access token of the user session to the upstream, and answer 401 without calling it if the
+ * user is not logged in. They answer 403 to the `POST`, `PUT`, `PATCH` and `DELETE` requests coming from another site.
  *
  * @param app - Fastify instance to configure.
  * @param config - Server configuration.
  * @param getFreshAccessToken - Gives the access token of the user session, or `null` if the user is not logged in.
+ *   Omitted to register the routes without `withAccessToken`.
  */
 export function registerProxies(
   app: FastifyInstance,
   config: ServerConfig,
-  getFreshAccessToken: (request: FastifyRequest) => Promise<string | null>
+  getFreshAccessToken?: (request: FastifyRequest) => Promise<string | null>
 ): void {
   config.proxies
+    .filter((route) => !route.withAccessToken === !getFreshAccessToken)
     .map((route): FastifyHttpProxyOptions => ({
       prefix: route.prefix,
       upstream: route.upstream,
       rewritePrefix:
         route.rewritePrefix ?? (route.keepPrefix ? route.prefix : undefined),
-      preHandler: route.withAccessToken
+      preHandler: getFreshAccessToken
         ? async (request, reply) => {
             // Sec-Fetch-Site is set by the browser: same-origin means a page of this server
             if (
