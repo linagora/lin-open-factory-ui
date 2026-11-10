@@ -55,16 +55,27 @@ Used by `task setup:config` to generate `server-config.json`.
 | `SESSION_SECRET`                | `session.secret`                                                 | 32 characters or more                    | Secret used to sign the session cookie            |
 | `SESSION_COOKIE_NAME`           | `session.cookieName`                                             | `lin-open-factory`                       | Name of the session cookie                        |
 | `SESSION_MAX_AGE_MILLISECONDS`  | `session.maxAgeMilliseconds`                                     | `28800000` (8 hours)                     | Lifetime of the session cookie from the login, ms |
-| `SESSION_LRU_CACHE_MAX`         | `session.lruCache.max`                                           | `10000`                                  | Maximum number of sessions in memory              |
-| `SESSION_LRU_CACHE_TTL`         | `session.lruCache.ttl`                                           | `28800000` (8 hours)                     | Lifetime of a session after its last change, ms   |
-| `SESSION_LRU_CACHE_TTL_AUTOPURGE` | `session.lruCache.ttlAutopurge`                                | `true`                                   | Deletes each session as soon as it expires        |
+| `SESSION_DATABASE_HOST`         | `session.database.host`                                          | `db`                                     | Host of the database of the sessions              |
+| `SESSION_DATABASE_PORT`         | `session.database.port`                                          | `5432`                                   | Port of the database of the sessions              |
+| `UI_DATABASE_NAME`              | `session.database.database`                                      | `lin_open_factory`                       | Name of the database of the sessions              |
+| `UI_DATABASE_USER`              | `session.database.user`                                          | `lin_open_factory_user`                  | PostgreSQL user of the server, data only          |
+| `UI_DATABASE_PASSWORD`          | `session.database.password`                                      | `password`                               | Password of `UI_DATABASE_USER`                    |
+| `UI_DATABASE_ADMIN_USER`        | `session.migrations.database.user`                               | `lin_open_factory_admin`                 | Owner of the database, applies the migrations     |
+| `UI_DATABASE_ADMIN_PASSWORD`    | `session.migrations.database.password`                           | `password`                               | Password of `UI_DATABASE_ADMIN_USER`              |
+| `SESSION_DATABASE_SSL`          | `session.database.ssl`                                           | `false`                                  | TLS to the database, written as JSON              |
+| `SESSION_DATABASE_POOL_MAX`     | `session.database.max`                                           | `10`                                     | Maximum number of connections                     |
+| `SESSION_DATABASE_CONNECTION_TIMEOUT_MILLISECONDS` | `session.database.connectionTimeoutMillis`    | `5000` (5 seconds)                       | Wait for a free connection before failing, ms     |
+| `SESSION_DATABASE_IDLE_TIMEOUT_MILLISECONDS` | `session.database.idleTimeoutMillis`                | `10000` (10 seconds)                     | Unused connection closed after, ms                |
+| `SESSION_MIGRATIONS_TABLE`      | `session.migrations.table`                                       | `pgmigrations`                           | Table recording the applied migrations            |
 | `CONTENT_SECURITY_POLICY`       | `contentSecurityPolicy`                                          | `"default-src 'self'; ..."`              | `Content-Security-Policy` of `index.html`         |
 
 `LEMONLDAP_REDIRECT_URL` and `LEMONLDAP_PORTAL_HOSTNAME` are in `e2e.env` / `local.env`, because their values differ
 between CI and local runs. `OIDC_LOGOUT_PATH` is the path of the SSO as served by the UI server, under `/auth`.
 `OIDC_PKCE` empty does not disable PKCE: the method is then chosen from the discovery of the provider.
 `HTTP_TRUST_PROXY` is written as is in the JSON: quote the strings, e.g. `'"10.0.0.1"'` or
-`'["10.0.0.1", "10.0.0.0/8"]'`.
+`'["10.0.0.1", "10.0.0.0/8"]'`. So is `SESSION_DATABASE_SSL`, e.g. `true` or `'{"rejectUnauthorized": false}'`.
+The `UI_DATABASE_*` variables are in `db.env`: the database container creates the database and its two users with them
+(`docker/init-db/init_ui_db.sh`).
 `OIDC_CLIENT_SECRET` is in `e2e.env` / `local.env`, because it must match the configuration of the OIDC client in the
 SSO (`oidcRPMetaDataOptionsClientSecret` in LemonLDAP::NG). In development, `server-config.json` is not generated:
 the secret is written in it and must match `OIDC_CLIENT_SECRET` of `docker/dev/env/dev.env`.

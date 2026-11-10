@@ -59,6 +59,10 @@ For `/backend` and `/auth/me` (`withAccessToken`), the UI server:
 3. adds `Authorization: Bearer <access token>` and removes the cookie;
 4. forwards the request.
 
+During the renewal, the session is locked in the database (`SELECT ... FOR UPDATE`): the requests renewing the same
+session at the same time, on any instance of the server, wait, then use the token saved by the first one. The SSO is
+called once and a revoked refresh token is never reused.
+
 If the SSO does not send a new refresh token or ID token on renewal (allowed by OAuth 2 and OIDC), the previous ones
 are kept. If the renewal fails, the session is destroyed and the server answers `401`: the SPA redirects to the login.
 
@@ -66,8 +70,10 @@ are kept. If the renewal fails, the session is destroyed and the server answers 
 
 ## 🍪 Session
 
-* Stored in the **server memory** (`@fastify/session`), no database.
-* Stored in a `LRUCache`, configured with `session.lruCache`.
+* Stored in **PostgreSQL** (`@fastify/session`), in the `sessions` table, configured with `session.database`.
+* The sessions survive a restart of the server and are shared by its instances: the server keeps no state in memory.
+* The session is only loaded by `/auth` and the proxies: the static files never query the database, and the SPA still
+  loads when the database is down.
 * The cookie only holds the **session ID**, signed with `session.secret`.
 * The cookie is `HttpOnly`, `Secure` and `SameSite=Lax` by default.
 * The session holds the tokens (access, refresh, ID). **They are never sent to the browser.**
