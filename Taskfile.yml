@@ -286,7 +286,7 @@ tasks:
     desc: Generate configuration from templates using env variables
     internal: true
     dir: "docker/{{.ENV}}/resources"
-    dotenv: ["../{{.ENV_FILE}}", "../env/ui.env"]
+    dotenv: ["../{{.ENV_FILE}}", "../env/ui.env", "../env/db.env"]
     cmds:
       - rm -rf ${CONFIG_DIR}/conf
       - mkdir -p ${CONFIG_DIR}/conf

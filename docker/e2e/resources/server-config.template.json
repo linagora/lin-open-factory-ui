@@ -29,10 +29,23 @@
     "secret": "${SESSION_SECRET}",
     "cookieName": "${SESSION_COOKIE_NAME}",
     "maxAgeMilliseconds": ${SESSION_MAX_AGE_MILLISECONDS},
-    "lruCache": {
-      "max": ${SESSION_LRU_CACHE_MAX},
-      "ttl": ${SESSION_LRU_CACHE_TTL},
-      "ttlAutopurge": ${SESSION_LRU_CACHE_TTL_AUTOPURGE}
+    "database": {
+      "host": "${SESSION_DATABASE_HOST}",
+      "port": ${SESSION_DATABASE_PORT},
+      "database": "${UI_DATABASE_NAME}",
+      "user": "${UI_DATABASE_USER}",
+      "password": "${UI_DATABASE_PASSWORD}",
+      "ssl": ${SESSION_DATABASE_SSL},
+      "max": ${SESSION_DATABASE_POOL_MAX},
+      "connectionTimeoutMillis": ${SESSION_DATABASE_CONNECTION_TIMEOUT_MILLISECONDS},
+      "idleTimeoutMillis": ${SESSION_DATABASE_IDLE_TIMEOUT_MILLISECONDS}
+    },
+    "migrations": {
+      "table": "${SESSION_MIGRATIONS_TABLE}",
+      "database": {
+        "user": "${UI_DATABASE_ADMIN_USER}",
+        "password": "${UI_DATABASE_ADMIN_PASSWORD}"
+      }
     }
   },
   "proxies": [
