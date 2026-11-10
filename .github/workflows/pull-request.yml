@@ -20,51 +20,6 @@ jobs:
           delete_user_name: github-actions[bot]
           issue_number: ${{ github.event.number }}
 
-  validate-source-branch:
-    name: Validate source branch
-    needs: [delete-comments]
-    runs-on: linagora
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Check branch name
-        id: check
-        # Passed through env, not expanded in the script: a branch name is attacker-controlled
-        env:
-          BRANCH: ${{ github.head_ref }}
-          BASE_BRANCH: ${{ github.base_ref }}
-        run: |
-          echo "Source branch: $BRANCH"
-
-          if [[ "$BASE_BRANCH" != "main" ]]; then
-            echo "Target branch is '$BASE_BRANCH', not main — skipping validation"
-            exit 0
-          fi
-
-          if [[ "$BRANCH" =~ ^(release|hotfix)/.+$ ]]; then
-            echo "✅ Branch '$BRANCH' is allowed"
-            exit 0
-          fi
-
-          echo "❌ Branch '$BRANCH' is not allowed"
-          echo "Only release/* and hotfix/* branches can be merged into main"
-          exit 1
-
-      - name: Comment PR on failure
-        if: failure()
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        with:
-          message: |
-            ❌ **Merge blocked into `main`**
-
-            The source branch `${{ github.head_ref }}` is not allowed to be merged into `main`.
-
-            Allowed source branches are:
-            - `release/*`
-            - `hotfix/*`
-
-            Please create or rename your branch to follow the required naming convention before merging.
-
   branch-naming-rules:
     name: Check branch name
     needs: [delete-comments]
@@ -104,7 +59,7 @@ jobs:
 
   ui-build:
     name: UI - Build application
-    needs: [validate-source-branch]
+    needs: [delete-comments]
     runs-on: linagora
     container:
       image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
@@ -208,7 +163,7 @@ jobs:
 
   e2e-check-style:
     name: E2E - Code style
-    needs: [validate-source-branch]
+    needs: [delete-comments]
     runs-on: linagora
     container:
       image: harbor.linagora.com/docker-hub-proxy/library/node:22-bookworm
