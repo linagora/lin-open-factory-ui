@@ -28,20 +28,28 @@ Ensuring these are met will allow a smooth setup and avoid common issues.
 * The SSO must declare the OIDC client of the UI server (`OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET`), with
   `{publicUrl}/auth/callback` as redirect URI and `{publicUrl}/auth/logged-out` as post-logout redirect URI
 
-### 2️⃣ Node.js / Frontend
+### 2️⃣ PostgreSQL
+
+* **PostgreSQL**, storing the sessions of the UI server: the server does not start without it
+* A database owned by an admin user, which applies the migrations at startup, and a user of the server, which only
+  reads and writes data (see [server configuration](../configuration/ui/server-config.md) and
+  [database migrations](../advanced/database-migrations.md))
+* The development and E2E environments start their own PostgreSQL, with this database and its users
+
+### 3️⃣ Node.js / Frontend
 
 * **Node.js 22** or later (for development and local builds)
 * **pnpm 11**
 
 > ⚠️ Required only if you plan to build or customize the frontend locally. Docker images include prebuilt frontend.
 
-### 3️⃣ Docker
+### 4️⃣ Docker
 
 * **Docker 24+**
 * **Docker Compose 2+**
 * Used to run the SSO of the development environment and the E2E environment of the UI
 
-### 4️⃣ Task
+### 5️⃣ Task
 
 * **Task** ([https://taskfile.dev/#/installation](https://taskfile.dev/#/installation))
 * Used to generate the certificates and configuration files, and to start the environments
