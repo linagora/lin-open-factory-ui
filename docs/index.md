@@ -47,6 +47,7 @@ You need deeper technical insights or troubleshooting.
 👉 Start here:
 
 * [advanced/bff](advanced/bff.md)
+* [advanced/database-migrations](advanced/database-migrations.md)
 
 ---
 

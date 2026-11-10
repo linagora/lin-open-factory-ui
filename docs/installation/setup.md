@@ -42,6 +42,8 @@ The UI server reads `server/server-config.json`, which expects:
 * the SSO (LemonLDAP::NG) on `https://localhost:8080`, declaring the OIDC client `lin-open-factory-client`: started
   in Docker by `task start:dev` (see `docker/dev/README.md`), with the accounts `admin` / `password` and
   `user1` / `password`
+* PostgreSQL on `localhost:5432`, storing the sessions in the `lin_open_factory` database: started in Docker by
+  `task start:dev`, with the users `lin_open_factory_admin` (migrations) and `lin_open_factory_user` (server)
 * the LinID API on `https://localhost:8443`, started outside of this project
 * the Module Federation remote (LinPulsar) on `http://localhost:5001`, started outside of this project
 
