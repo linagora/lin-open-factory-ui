@@ -34,8 +34,8 @@ import { registerSession } from './plugins/session.js';
 import { registerStaticFiles } from './plugins/staticFiles.js';
 
 /**
- * Builds the Fastify application, without starting it: HTTPS when `http.tls` is set, `GET /health`, user session,
- * authentication routes, reverse proxies and static files.
+ * Builds the Fastify application, without starting it: HTTPS when `http.tls` is set, `GET /health`, user session with
+ * the authentication routes and reverse proxies, and static files.
  *
  * @param config - Server configuration.
  * @returns The configured Fastify instance.
@@ -52,9 +52,13 @@ export function buildApp(config: ServerConfig): FastifyInstance {
 
   app.get('/health', async () => ({ status: 'ok' }));
 
-  registerSession(app, config);
-  const getFreshAccessToken = registerAuth(app, config);
-  registerProxies(app, config, getFreshAccessToken);
+  // The session is only loaded by the routes of this scope: the static files are served without a database query, even
+  // when the database is down
+  app.register(async (scope) => {
+    const sessionStore = registerSession(scope, config);
+    const getFreshAccessToken = registerAuth(scope, config, sessionStore);
+    registerProxies(scope, config, getFreshAccessToken);
+  });
   registerStaticFiles(app, config);
 
   return app;

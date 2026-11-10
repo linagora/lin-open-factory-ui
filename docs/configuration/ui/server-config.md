@@ -50,7 +50,21 @@
     "secret": "e2e-only-session-secret-do-not-use-in-production",
     "cookieName": "lin-open-factory",
     "maxAgeMilliseconds": 28800000,
-    "lruCache": { "max": 10000, "ttl": 28800000, "ttlAutopurge": true }
+    "database": {
+      "host": "db",
+      "port": 5432,
+      "database": "lin_open_factory",
+      "user": "lin_open_factory_user",
+      "password": "password",
+      "ssl": false,
+      "max": 10,
+      "connectionTimeoutMillis": 5000,
+      "idleTimeoutMillis": 10000
+    },
+    "migrations": {
+      "table": "pgmigrations",
+      "database": { "user": "lin_open_factory_admin", "password": "password" }
+    }
   },
   "proxies": [
     { "prefix": "/backend", "upstream": "https://linid.localtest.me:8443", "withAccessToken": true },
@@ -197,20 +211,43 @@ the [documentation of `@fastify/oauth2`](https://github.com/fastify/fastify-oaut
 | `secret`             | —       | Signs the session cookie. **At least 32 characters**         |
 | `cookieName`         | —       | Name of the session cookie                                   |
 | `maxAgeMilliseconds` | —       | Lifetime of the session cookie from the login, in ms         |
-| `lruCache`           | —       | Options of `lru-cache`, see below                            |
+| `database`           | —       | Options of the `pg` pool, see below                          |
+| `migrations`         | —       | Database migrations, see below                               |
 | `secure`             | `true`  | Cookie sent over HTTPS only. Set `false` only for plain HTTP |
 | `sameSite`           | `lax`   | `lax` (recommended), `strict` or `none`                      |
 
-### `session.lruCache`
+### `session.database`
 
-The sessions are stored in server memory in a `LRUCache`, created with these options as is (see the documentation of
-`lru-cache`). For example:
+The sessions are stored in the `sessions` table of a PostgreSQL database, through a `pg.Pool` created with these
+options (see the documentation of `pg`), as is. For example:
 
-| Parameter        | Description                                                                                     |
-|------------------|-------------------------------------------------------------------------------------------------|
-| `max`            | Maximum number of sessions, the least recently used are deleted beyond                          |
-| `ttl`            | Lifetime of a session after its last change (login, token renewal), e.g. `maxAgeMilliseconds`   |
-| `ttlAutopurge`   | `true` deletes each session as soon as it expires, otherwise only when it is read or evicted    |
+| Parameter                 | Default | Description                                                                         |
+|---------------------------|---------|-------------------------------------------------------------------------------------|
+| `host`, `port`            | —       | Address of the database                                                             |
+| `database`                | —       | Name of the database                                                                |
+| `user`, `password`        | —       | Credentials of the UI server                                                        |
+| `connectionString`        | —       | Instead of the parameters above, e.g. `postgres://user:password@host:5432/database` |
+| `ssl`                     | `false` | `true`, or the options of `tls.connect` (e.g. `{"rejectUnauthorized": false}`)      |
+| `max`                     | `10`    | Maximum number of connections                                                       |
+| `connectionTimeoutMillis` | `5000`  | A request fails when no connection is available after this delay, instead of hanging |
+| `idleTimeoutMillis`       | `10000` | An unused connection is closed after this delay                                     |
+
+The user of `database` only needs to read and write the data of the tables (`SELECT`, `INSERT`, `UPDATE`, `DELETE`):
+the tables are created by the migrations, with the user of `session.migrations.database`. A session expires with its
+cookie (`maxAgeMilliseconds`): the expired sessions are never read, and are deleted at each login.
+
+### `session.migrations`
+
+The schema is created at startup by the migrations of `server/migrations`, see
+[database migrations](../../advanced/database-migrations.md).
+
+| Parameter  | Default        | Description                                                                                       |
+|------------|----------------|---------------------------------------------------------------------------------------------------|
+| `table`    | `pgmigrations` | Table recording the applied migrations                                                            |
+| `database` | —              | Options of the connection applying the migrations, merged over `session.database`: e.g. `user` and `password` of the owner of the database. Without it, the user of `session.database`, which then needs the right to create tables |
+
+In the Docker environments, `docker/init-db/init_ui_db.sh` creates the two users: the admin owns the database, and
+the user of the server gets the data rights on the tables that the admin creates (`ALTER DEFAULT PRIVILEGES`).
 
 ### `proxies`
 

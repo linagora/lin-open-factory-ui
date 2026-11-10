@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ],
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "stop:dev": "pkill -f '[w]atch src/main.ts'",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "migration:create": "node-pg-migrate create --migration-file-language sql --migration-filename-format index --migrations-dir migrations",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"*.{js,ts,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js}\" \"*.{js,ts,json}\"",
     "type-check": "tsc --noEmit -p tsconfig.json",
@@ -23,10 +25,12 @@
     "@fastify/session": "11.1.5",
     "@fastify/static": "10.1.8",
     "fastify": "5.12.7",
-    "lru-cache": "11.5.3"
+    "node-pg-migrate": "9.0.0",
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
     "prettier": "3.9.10",
     "prettier-plugin-jsdoc": "1.8.1",
     "tsx": "4.23.15",

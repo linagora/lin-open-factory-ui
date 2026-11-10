@@ -25,8 +25,7 @@
  */
 
 import type { FastifyOAuth2Options } from '@fastify/oauth2';
-import type { Session } from 'fastify';
-import type { LRUCache } from 'lru-cache';
+import type { ClientConfig, PoolConfig } from 'pg';
 
 /** Reverse proxy route. */
 export interface ProxyRoute {
@@ -71,7 +70,7 @@ export interface ServerConfig {
     /** The access token is renewed when it expires in less than this number of milliseconds, `30000` by default. */
     refreshMarginMilliseconds?: number;
   };
-  /** User session, stored in server memory and identified by a cookie. */
+  /** User session, stored in PostgreSQL and identified by a cookie. */
   session: {
     /** Secret used to sign the session cookie, at least 32 characters. */
     secret: string;
@@ -83,8 +82,21 @@ export interface ServerConfig {
     sameSite?: 'lax' | 'strict' | 'none';
     /** Lifetime of the session cookie from the login, in milliseconds. */
     maxAgeMilliseconds: number;
-    /** Options of `lru-cache`, the store of the sessions in memory. */
-    lruCache: LRUCache.Options<string, Session, unknown>;
+    /**
+     * Options of the `pg` pool connecting to the database of the sessions, e.g. `connectionString`, with a user that
+     * only reads and writes data.
+     */
+    database: PoolConfig;
+    /** Database migrations, applied at startup. */
+    migrations?: {
+      /** Table recording the applied migrations, `pgmigrations` by default. */
+      table?: string;
+      /**
+       * Options of the connection applying the migrations, merged over `database`: e.g. `user` and `password` of the
+       * owner of the database. The user of `database` by default.
+       */
+      database?: ClientConfig;
+    };
   };
   /** Reverse proxy routes. */
   proxies: ProxyRoute[];

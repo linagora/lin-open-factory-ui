@@ -8,10 +8,14 @@ services:
       - lin-open-factory-dev-network
     env_file:
       - ./env/db.env
+    # Reached by the UI server, which runs on the host
+    ports:
+      - ${DB_PORT}:5432
     volumes:
-      - ../init-db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+      - ../init-db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1' || exit 1"]
+      # Over TCP and on the database of the UI server: not ready while init_db.sql runs on the temporary init server
+      test: ["CMD-SHELL", "PGPASSWORD=$$POSTGRES_PASSWORD psql -h 127.0.0.1 -U $$POSTGRES_USER -d $$UI_DATABASE_NAME -c 'SELECT 1' || exit 1"]
       interval: 2s
       timeout: 5s
       retries: 5
