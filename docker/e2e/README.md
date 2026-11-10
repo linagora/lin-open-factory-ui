@@ -28,7 +28,7 @@ selected language being also kept in the local storage of the browser. The acces
 | --------------- | ------------------------------------ | -------------------------------------------- |
 | ui              | https://linid.localtest.me:9000      | LinOpenFactoryUi                        |
 | auth            | https://linid.localtest.me:9000/auth | SSO (LemonLDAP::NG), served by the UI server |
-| db              | (internal network)                   | PostgreSQL of LemonLDAP::NG                  |
+| db              | (internal network)                   | PostgreSQL of LemonLDAP::NG and of the UI server sessions |
 | api             | (internal network)                   | Fake of the LinID API                        |
 | lin-pulsar      | (internal network)                   | UI components library                        |
 | e2e-test-runner | (internal network)                   | Runner to execute e2e tests                  |
