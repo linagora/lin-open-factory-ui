@@ -214,8 +214,8 @@ the [documentation of `@fastify/oauth2`](https://github.com/fastify/fastify-oaut
 
 ### `session.database`
 
-The sessions are stored in the `sessions` table of a PostgreSQL database, through a `pg.Pool` created with these
-options (see the documentation of `pg`), as is. For example:
+The sessions (`sessions` table) and the [user preferences](../../advanced/bff.md#-user-preferences)
+(`user_preferences` table) are stored in a PostgreSQL database, through a single `pg.Pool` created with these options (see the documentation of `pg`), as is. For example:
 
 | Parameter                 | Default | Description                                                                         |
 |---------------------------|---------|-------------------------------------------------------------------------------------|

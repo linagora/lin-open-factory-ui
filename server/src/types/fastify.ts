@@ -34,6 +34,14 @@ declare module 'fastify' {
     oidc: OAuth2Namespace;
   }
 
+  /** Incoming request. */
+  interface FastifyRequest {
+    /** Fresh access token of the user session, set by the session guard (`plugins/security.ts`). */
+    accessToken: string;
+    /** Subject of the logged-in user, set on the user preference routes (`plugins/user-preferences.ts`). */
+    userId: string;
+  }
+
   /** Data stored in the user session (`plugins/session.ts`). */
   interface Session {
     /** Tokens of the logged-in user (access, refresh and ID tokens), never sent to the browser. */

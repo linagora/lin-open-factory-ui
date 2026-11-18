@@ -18,7 +18,8 @@ cookie.
 ```text
 Browser ── cookie ──► UI server ── OAuth 2 / OIDC ─────► SSO (LemonLDAP::NG)
                           │
-                          └── /backend + Bearer token ─► LinID API
+                          ├── /backend/user-preferences ─► PostgreSQL (UI server database)
+                          └── /backend + Bearer token ──► LinID API
 ```
 
 ---
@@ -34,6 +35,15 @@ Browser ── cookie ──► UI server ── OAuth 2 / OIDC ─────�
 | `/auth/logged-out` | Where the SSO sends the user back after the logout: redirects to `/auth/login`                                                               |
 
 Any other `/auth/*` path is proxied to LemonLDAP::NG.
+
+| Route                                | Behavior                                                                          |
+|--------------------------------------|-----------------------------------------------------------------------------------|
+| `GET /backend/user-preferences`      | Preferences of the logged-in user, as a `{ "key": "value" }` object               |
+| `POST /backend/user-preferences`     | Creates or updates a preference (`{ "key", "value" }`), answers `201` with it     |
+| `DELETE /backend/user-preferences/:key` | Deletes a preference of the logged-in user: `204`, or `404` if it does not exist |
+
+These routes are served by the UI server itself and take precedence over the `/backend` proxy, see
+[User preferences](#-user-preferences).
 
 ---
 
@@ -68,13 +78,33 @@ are kept. If the renewal fails, the session is destroyed and the server answers 
 
 ---
 
+## ⭐ User preferences
+
+The preferences of the users (e.g. language, theme) are stored by the UI server, in the `user_preferences` table of
+its database. The SPA (`useLinPulsarUserPreference` of `lin-pulsar-core`) calls them with its backend client, under
+`/backend/user-preferences`.
+
+* **A user only reads and changes their own preferences.** The user is always the subject (`sub` claim) of the ID
+  token of the session, never a value of the request: a `userId` sent in the body is ignored, and a key of another user
+  is never found (`404`).
+* The ID token is not verified again: the server received it from the token endpoint of the SSO over TLS, and it never
+  comes from the browser.
+* Without a session, or when the renewal of the tokens fails, the routes answer `401`. A session without a `sub` in its
+  ID token is refused the same way.
+* Like the `withAccessToken` proxies, `POST` and `DELETE` coming from another site are refused with `403`.
+* The key is made of letters and digits, separated by single `-`, `_` or `.` (e.g. `table.users-columns`). The value
+  is free text, not blank. Otherwise the server answers `400`.
+* Saving an existing key replaces its value (atomic upsert).
+
+---
+
 ## 🍪 Session
 
 * Stored in **PostgreSQL** (`@fastify/session`), in the `sessions` table, configured with `session.database`.
 * The sessions survive a restart of the server and are shared by its instances: the server keeps no state in memory.
-* The session is only loaded by the `/auth` routes of the server and the proxies with `withAccessToken`: the static
-  files and the other proxies (LemonLDAP::NG, LinPulsar) never query the database, and the SPA and the login page still
-  load when the database is down.
+* The session is only loaded by the `/auth` routes of the server, the user preferences and the proxies with
+  `withAccessToken`: the static files and the other proxies (LemonLDAP::NG, LinPulsar) never query the database, and
+  the SPA and the login page still load when the database is down.
 * The cookie only holds the **session ID**, signed with `session.secret`.
 * The cookie is `HttpOnly`, `Secure` and `SameSite=Lax` by default.
 * The session holds the tokens (access, refresh, ID). **They are never sent to the browser.**

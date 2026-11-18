@@ -28,11 +28,9 @@ import {
   fastifyHttpProxy,
   type FastifyHttpProxyOptions,
 } from '@fastify/http-proxy';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ServerConfig } from '../config/schema.js';
-
-/** Methods that change data, refused when the request comes from another site (CSRF). */
-const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+import type { GuardHook } from './security.js';
 
 /**
  * Removes a cookie from a `Cookie` header, keeping the other cookies.
@@ -61,60 +59,35 @@ function removeCookie(
 }
 
 /**
- * Tells if a request comes from a page of this server: by `Sec-Fetch-Site` when the browser sends it, otherwise by
- * comparing `Origin` to the origin of the server. A request with neither header is refused.
- *
- * @param request - Incoming request.
- * @returns `true` if the request comes from this server.
- */
-function isSameOrigin(request: FastifyRequest): boolean {
-  const fetchSite = request.headers['sec-fetch-site'];
-  if (fetchSite) {
-    return fetchSite === 'same-origin';
-  }
-  return request.headers.origin === `${request.protocol}://${request.host}`;
-}
-
-/**
- * Registers the reverse proxies declared in `proxies` with `withAccessToken` when `getFreshAccessToken` is given (in
- * the scope of the session), the others otherwise (out of it, without database query). The routes with
- * `withAccessToken` send the access token of the user session to the upstream, and answer 401 without calling it if the
- * user is not logged in. They answer 403 to the `POST`, `PUT`, `PATCH` and `DELETE` requests coming from another site.
+ * Registers the reverse proxies declared in `proxies` with `withAccessToken` when `sessionGuard` is given (in the scope
+ * of the session), the others otherwise (out of it, without database query). The routes with `withAccessToken` go
+ * through the session guard (`403` cross-site writes, `401` when the user is not logged in), then send the access token
+ * of the user session to the upstream.
  *
  * @param app - Fastify instance to configure.
  * @param config - Server configuration.
- * @param getFreshAccessToken - Gives the access token of the user session, or `null` if the user is not logged in.
- *   Omitted to register the routes without `withAccessToken`.
+ * @param sessionGuard - Hook of the routes needing a logged-in user (`createSessionGuard`). Omitted to register the
+ *   routes without `withAccessToken`.
  */
 export function registerProxies(
   app: FastifyInstance,
   config: ServerConfig,
-  getFreshAccessToken?: (request: FastifyRequest) => Promise<string | null>
+  sessionGuard?: GuardHook
 ): void {
   config.proxies
-    .filter((route) => !route.withAccessToken === !getFreshAccessToken)
+    .filter((route) => !route.withAccessToken === !sessionGuard)
     .map((route): FastifyHttpProxyOptions => ({
       prefix: route.prefix,
       upstream: route.upstream,
       rewritePrefix:
         route.rewritePrefix ?? (route.keepPrefix ? route.prefix : undefined),
-      preHandler: getFreshAccessToken
+      preHandler: sessionGuard
         ? async (request, reply) => {
-            // Sec-Fetch-Site is set by the browser: same-origin means a page of this server
-            if (
-              UNSAFE_METHODS.includes(request.method) &&
-              !isSameOrigin(request)
-            ) {
-              return reply
-                .code(403)
-                .send({ message: 'Cross-site request refused' });
+            const refused = await sessionGuard(request, reply);
+            if (refused) {
+              return refused;
             }
-
-            const accessToken = await getFreshAccessToken(request);
-            if (!accessToken) {
-              return reply.code(401).send({ message: 'Authentication failed' });
-            }
-            request.headers.authorization = `Bearer ${accessToken}`;
+            request.headers.authorization = `Bearer ${request.accessToken}`;
             // The upstream is authenticated by the access token, it does not need the cookies of the browser
             delete request.headers.cookie;
           }
