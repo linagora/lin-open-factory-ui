@@ -2,7 +2,7 @@
 # ============================================================================
 # UI server database
 # ============================================================================
-# Database of the UI server (BFF), which stores the user sessions, and its two users (env/db.env):
+# Database of the UI server (BFF), which stores the user sessions and preferences, and its two users (env/db.env):
 # - UI_DATABASE_ADMIN_USER owns the database and applies the migrations at startup (server/migrations);
 # - UI_DATABASE_USER, used by the server to run, only reads and writes the data of the tables created by the admin.
 # In production, passwords should be managed through secrets.

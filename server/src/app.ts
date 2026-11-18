@@ -29,14 +29,16 @@ import { fastify } from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import type { ServerConfig } from './config/schema.js';
 import { registerAuth } from './plugins/auth.js';
+import { createPool } from './plugins/database.js';
 import { registerProxies } from './plugins/proxies.js';
 import { createSessionGuard } from './plugins/security.js';
 import { registerSession } from './plugins/session.js';
 import { registerStaticFiles } from './plugins/staticFiles.js';
+import { registerUserPreferences } from './plugins/user-preferences.js';
 
 /**
  * Builds the Fastify application, without starting it: HTTPS when `http.tls` is set, `GET /health`, user session with
- * the authentication routes and reverse proxies, and static files.
+ * the authentication routes, the user preferences and reverse proxies, and static files.
  *
  * @param config - Server configuration.
  * @returns The configured Fastify instance.
@@ -56,9 +58,11 @@ export function buildApp(config: ServerConfig): FastifyInstance {
   // The session is only loaded by the routes of this scope: the static files and the proxies without access token are
   // served without a database query, even when the database is down
   app.register(async (scope) => {
-    const sessionStore = registerSession(scope, config);
+    const pool = createPool(scope, config.session.database);
+    const sessionStore = registerSession(scope, config, pool);
     const getFreshAccessToken = registerAuth(scope, config, sessionStore);
     const sessionGuard = createSessionGuard(scope, getFreshAccessToken);
+    registerUserPreferences(scope, pool, sessionGuard);
     registerProxies(scope, config, sessionGuard);
   });
   registerProxies(app, config);

@@ -27,7 +27,7 @@
 import type { Token } from '@fastify/oauth2';
 import type { SessionStore } from '@fastify/session';
 import type { FastifyBaseLogger, Session } from 'fastify';
-import pg from 'pg';
+import type pg from 'pg';
 
 /** Row of the `sessions` table, as read by the store. */
 interface SessionRow {
@@ -49,18 +49,12 @@ export class PgSessionStore implements SessionStore {
   /**
    * Creates the store.
    *
-   * @param options - Options of the `pg` pool, e.g. `connectionString`. A connection waits 5 seconds at most by default
-   *   (`connectionTimeoutMillis`).
+   * @param pool - Pool of connections to the database (`plugins/database.ts`), closed by its owner.
    * @param log - Logger of the database errors.
    */
-  constructor(options: pg.PoolConfig, log: FastifyBaseLogger) {
+  constructor(pool: pg.Pool, log: FastifyBaseLogger) {
+    this.pool = pool;
     this.log = log;
-    // A request fails fast instead of hanging when the database is down or every connection is in use
-    this.pool = new pg.Pool({ connectionTimeoutMillis: 5000, ...options });
-    // Without a listener, losing an idle connection (database restart, network) would crash the process
-    this.pool.on('error', (error) =>
-      log.error({ err: error }, 'Idle database connection lost')
-    );
   }
 
   /**
@@ -176,14 +170,5 @@ export class PgSessionStore implements SessionStore {
       client.off('error', onError);
       client.release(releaseError);
     }
-  }
-
-  /**
-   * Closes the connections to the database.
-   *
-   * @returns A promise resolved once the connections are closed.
-   */
-  close(): Promise<void> {
-    return this.pool.end();
   }
 }

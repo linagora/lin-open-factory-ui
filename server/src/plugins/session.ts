@@ -29,6 +29,7 @@ import { fastifyCookie } from '@fastify/cookie';
 import { fastifySession } from '@fastify/session';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { runner } from 'node-pg-migrate';
+import type pg from 'pg';
 import type { ServerConfig } from '../config/schema.js';
 import { PgSessionStore } from './pg-session-store.js';
 
@@ -64,14 +65,15 @@ export async function migrate(
  *
  * @param app - Fastify instance to configure.
  * @param config - Server configuration.
+ * @param pool - Pool of connections to the database of the server.
  * @returns The store of the sessions.
  */
 export function registerSession(
   app: FastifyInstance,
-  config: ServerConfig
+  config: ServerConfig,
+  pool: pg.Pool
 ): PgSessionStore {
-  const store = new PgSessionStore(config.session.database, app.log);
-  app.addHook('onClose', () => store.close());
+  const store = new PgSessionStore(pool, app.log);
   app.register(fastifyCookie);
   app.register(fastifySession, {
     store,

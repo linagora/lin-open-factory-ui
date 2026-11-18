@@ -1,6 +1,6 @@
 # 🗄️ Database migrations
 
-The schema of the UI server database (the user sessions) is managed with
+The schema of the UI server database (the user sessions and the user preferences) is managed with
 [node-pg-migrate](https://salsita.github.io/node-pg-migrate/), like Flyway.
 
 ## How it works
