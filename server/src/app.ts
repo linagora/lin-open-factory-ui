@@ -30,6 +30,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerConfig } from './config/schema.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerProxies } from './plugins/proxies.js';
+import { createSessionGuard } from './plugins/security.js';
 import { registerSession } from './plugins/session.js';
 import { registerStaticFiles } from './plugins/staticFiles.js';
 
@@ -57,7 +58,8 @@ export function buildApp(config: ServerConfig): FastifyInstance {
   app.register(async (scope) => {
     const sessionStore = registerSession(scope, config);
     const getFreshAccessToken = registerAuth(scope, config, sessionStore);
-    registerProxies(scope, config, getFreshAccessToken);
+    const sessionGuard = createSessionGuard(scope, getFreshAccessToken);
+    registerProxies(scope, config, sessionGuard);
   });
   registerProxies(app, config);
   registerStaticFiles(app, config);
